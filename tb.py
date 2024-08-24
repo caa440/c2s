@@ -44,12 +44,13 @@ def create_tcp_connection(server_ip, server_port, proxy=None):
         return False, str(e)
 
 # Fungsi untuk menjalankan load test TCP
-def load_test_tcp(server_ip, server_port, num_connections, max_workers, proxy_file):
+def load_test_tcp(server_ip, server_port, num_connections, max_workers, proxy_file, duration):
     proxies = load_proxies(proxy_file)
     proxy_cycle = cycle(proxies) if proxies else None
 
     times = []
     successful_connections = 0
+    start_time = time.time()
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [
@@ -57,6 +58,8 @@ def load_test_tcp(server_ip, server_port, num_connections, max_workers, proxy_fi
             for _ in range(num_connections)
         ]
         for future in as_completed(futures):
+            if time.time() - start_time > duration:
+                break
             success, elapsed_time = future.result()
             if success:
                 successful_connections += 1
@@ -66,12 +69,11 @@ def load_test_tcp(server_ip, server_port, num_connections, max_workers, proxy_fi
     total_connections = len(times)
     avg_time = sum(times) / total_connections if total_connections > 0 else float('nan')
 
-    print(f"Total Connections: {num_connections}")
+    print(f"Total Connections Attempted: {num_connections}")
     print(f"Successful Connections: {successful_connections}")
     print(f"Average Connection Time: {avg_time:.2f} seconds")
     print(f"Min Connection Time: {min(times):.2f} seconds")
     print(f"Max Connection Time: {max(times):.2f} seconds")
-    print(f"Done Attack By Pasa404")
 
 # Fungsi utama untuk parsing argument dan menjalankan test
 def main():
@@ -80,16 +82,16 @@ def main():
     parser.add_argument('server_port', type=int, help='Target port of the server')
     parser.add_argument('rps', type=int, help='Number of requests per second')
     parser.add_argument('threads', type=int, help='Number of concurrent threads')
+    parser.add_argument('duration', type=int, help='Duration of the attack in seconds')
     parser.add_argument('proxy_file', type=str, help='File containing list of proxies', nargs='?', default=None)
 
     args = parser.parse_args()
 
     # Hitung jumlah total koneksi yang akan dibuat berdasarkan RPS dan durasi yang diberikan
-    duration = 10  # Duration in seconds for which to send requests
-    num_connections = args.rps * duration
+    num_connections = args.rps * args.duration
 
     # Jalankan pengujian TCP dengan parameter yang diinput oleh pengguna
-    load_test_tcp(args.server_ip, args.server_port, num_connections, args.threads, args.proxy_file)
+    load_test_tcp(args.server_ip, args.server_port, num_connections, args.threads, args.proxy_file, args.duration)
 
 if __name__ == "__main__":
     main()
